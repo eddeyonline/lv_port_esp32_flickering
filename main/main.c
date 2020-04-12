@@ -25,7 +25,7 @@
 
 #include "esp_wifi.h"
 #include "esp_log.h"
-#include "esp_event_loop.h" //might not need this
+#include "esp_event_loop.h" //might not need this, deprecated
 #include "nvs_flash.h"
 #include "esp_freertos_hooks.h"
 #include "esp_system.h"
