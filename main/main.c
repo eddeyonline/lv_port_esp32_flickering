@@ -77,13 +77,13 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_FAIL_BIT      BIT1
 
 #if MODE_AP_STA == 0
-#define EXAMPLE_ESP_WIFI_SSID      "wifi_test"
-#define EXAMPLE_ESP_WIFI_PASS      "password"
-#define EXAMPLE_MAX_STA_CONN       4
+#define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_AP_WIFI_SSID
+#define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_AP_WIFI_PASSWORD
+#define EXAMPLE_MAX_STA_CONN       CONFIG_ESP_AP_MAX_STA_CONN
 static const char *TAG = "wifi AP mode";
 #else
-#define SSID  	"yourSSID" 
-#define PASS  	"yourPassword"
+#define SSID  	CONFIG_ESP_WIFI_SSID
+#define PASS  	CONFIG_ESP_WIFI_PASSWORD
 static const char *TAG = "wifi STA mode";
 #endif
 
