@@ -99,14 +99,11 @@ static void IRAM_ATTR lv_tick_task(void);
 static void configure_shared_spi_bus(void);
 #endif
 
-static void btn_event_cb(lv_obj_t * btn, lv_event_t event);
-
 /**********************
  *  STATIC VARIABLES
  **********************/
 
 static lv_obj_t * cont;
-
 
 /**********************
  *   STATIC FUNCTIONS
@@ -118,192 +115,18 @@ static lv_obj_t * cont;
  * @param event the triggering event
  * @return LV_RES_OK because the object is not deleted in this function
  */
-static void btn_event_cb(lv_obj_t * btn, lv_event_t event)
-{
-    if(event == LV_EVENT_RELEASED) {
-        lv_obj_t * label = lv_label_create(cont, NULL);
-        lv_obj_t * btnLabel = lv_obj_get_child(btn, NULL);
-        const char * txt = lv_label_get_text(btnLabel);
-        printf("%s button pressed", txt);
-        printf("button was pressed\n");
-        lv_label_set_text(label, "Button Pressed");
-    }
-}
-
-
+static void btn_event_cb(lv_obj_t * btn, lv_event_t event);
 
 static void event_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
-        } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }
-        ESP_LOGI(TAG,"connect to the AP fail");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "got ip:%s",
-                 ip4addr_ntoa(&event->ip_info.ip));
-        s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-    }
-    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
-        ESP_LOGI(TAG, "station "MACSTR" join, AID=%d",
-                 MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
-        ESP_LOGI(TAG, "station "MACSTR" leave, AID=%d",
-                 MAC2STR(event->mac), event->aid);
-    }
-}
-void wifi_init_sta()
-{
-    s_wifi_event_group = xEventGroupCreate();
+                        int32_t event_id, void* event_data);
 
-    tcpip_adapter_init();
+void wifi_init_sta(void);
 
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+void lv_tutorial_objects(void);
 
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
-
-#if MODE_AP_STA == 0
-	wifi_config_t ap_wifi_config = {
-        .ap = {
-            .ssid = EXAMPLE_ESP_WIFI_SSID,
-            .ssid_len = strlen(EXAMPLE_ESP_WIFI_SSID),
-            .password = EXAMPLE_ESP_WIFI_PASS,
-            .max_connection = EXAMPLE_MAX_STA_CONN,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK
-        },
-    };
-
-    if (strlen(EXAMPLE_ESP_WIFI_PASS) == 0) {
-        ap_wifi_config.ap.authmode = WIFI_AUTH_OPEN;
-    }
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP) ); 
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &ap_wifi_config) );
-#else
-	wifi_config_t sta_wifi_config = {
-        .sta = {
-            .ssid = SSID,
-            .password = PASS
-        },
-    };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) ); 
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &sta_wifi_config) );
-#endif
-    
-    ESP_ERROR_CHECK(esp_wifi_start() );
-
-#if MODE_AP_STA == 0
-    ESP_LOGI(TAG, "Soft AP initialised. SSID:%s password:%s",
-        EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
-#else
-	/* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
-
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-     * happened. */
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                 SSID, PASS);
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-                 SSID, PASS);
-    } else {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-    }
-    vEventGroupDelete(s_wifi_event_group);
-#endif
-    
-    ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler));
-    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler));   
-}
-
-
-void lv_tutorial_objects(void)
-{
-
-    /********************
-     * CREATE A SCREEN
-     *******************/
-    /* Create a new screen and load it
-     * Screen can be created from any type object type
-     * Now a Page is used which is an objects with scrollable content*/
-    static lv_style_t style;
-    lv_style_copy(&style, &lv_style_plain);
-    style.body.main_color = LV_COLOR_BLUE;
-    style.body.grad_color = LV_COLOR_BLUE;
-    style.text.color = LV_COLOR_WHITE;
-    lv_obj_t * scr = lv_page_create(NULL, NULL);
-    lv_page_set_style(scr, LV_PAGE_STYLE_BG, &style);
-    lv_page_set_style(scr, LV_PAGE_STYLE_SCRL, &style);
-    lv_page_set_sb_mode(scr, LV_SB_MODE_OFF);
-    lv_disp_load_scr(scr);
-
-    /****************
-     * ADD A TITLE
-     ****************/
-    lv_obj_t * label = lv_label_create(scr, NULL); /*First parameters (scr) is the parent*/
-    lv_label_set_text(label, "Test for flickering");  /*Set the text*/
-    lv_obj_set_x(label, 30);                        /*Set the x coordinate*/
-
-    /****************
-     * ADD A STATUS FIELD
-     ****************/
-
-    cont = lv_cont_create(lv_scr_act(), NULL);              //Global static definition so accessible in CB
-    lv_obj_set_auto_realign(cont, true);                    /*Auto realign when the size changes*/
-    lv_obj_align_origo(cont, NULL, LV_ALIGN_CENTER, 0, 0);  /*This parametrs will be sued when realigned*/
-    lv_cont_set_fit(cont, LV_FIT_TIGHT);
-    lv_cont_set_layout(cont, LV_LAYOUT_COL_M);
-
-    label = lv_label_create(cont, NULL);
-    #if MODE_AP_STA == 0
-    lv_label_set_text(label, "AP MODE");
-	#else
-	lv_label_set_text(label, "STA MODE");
-	#endif
-    
-
-    /***********************
-     * CREATE TWO BUTTONS
-     ***********************/
-    /*Create a button*/
-    lv_obj_t * btn1 = lv_btn_create(lv_disp_get_scr_act(NULL), NULL);         /*Create a button on the currently loaded screen*/
-    lv_obj_set_event_cb(btn1, btn_event_cb);                                  /*Set function to be called when the button is released*/
-    lv_obj_align(btn1, scr, LV_ALIGN_IN_BOTTOM_LEFT, 0, 0);               /*Align below the label*/
-
-    /*Create a label on the button (the 'label' variable can be reused)*/
-    label = lv_label_create(btn1, NULL);
-    lv_label_set_text(label, "<--");
-
-    /*Copy the previous button*/
-    lv_obj_t * btn2 = lv_btn_create(scr, btn1);                 /*Second parameter is an object to copy*/
-    lv_obj_align(btn2, scr, LV_ALIGN_IN_BOTTOM_RIGHT, 0, 0);    /*Align next to the prev. button.*/
-
-    /*Create a label on the button*/
-    label = lv_label_create(btn2, NULL);
-    lv_label_set_text(label, "-->");
-
-}
-
+/*****************************
+ * APPLICATION MAIN FUNCTION
+ *****************************/
 void app_main() {
    //Initialize NVS
   const static char* TAG = "app_main";
@@ -401,3 +224,185 @@ static void configure_shared_spi_bus(void)
   tp_spi_add_device(TOUCH_SPI_HOST);
 }
 #endif
+
+static void event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
+{
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY) {
+            esp_wifi_connect();
+            s_retry_num++;
+            ESP_LOGI(TAG, "retry to connect to the AP");
+        } else {
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        }
+        ESP_LOGI(TAG,"connect to the AP fail");
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "got ip:%s", ip4addr_ntoa(&event->ip_info.ip));
+        s_retry_num = 0;
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    }
+    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+        wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
+        ESP_LOGI(TAG, "station "MACSTR" join, AID=%d",
+                 MAC2STR(event->mac), event->aid);
+    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+        wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
+        ESP_LOGI(TAG, "station "MACSTR" leave, AID=%d",
+                 MAC2STR(event->mac), event->aid);
+    }
+}
+
+void wifi_init_sta(void)
+{
+    s_wifi_event_group = xEventGroupCreate();
+
+    tcpip_adapter_init();
+
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
+
+#if MODE_AP_STA == 0
+	wifi_config_t ap_wifi_config = {
+        .ap = {
+            .ssid = EXAMPLE_ESP_WIFI_SSID,
+            .ssid_len = strlen(EXAMPLE_ESP_WIFI_SSID),
+            .password = EXAMPLE_ESP_WIFI_PASS,
+            .max_connection = EXAMPLE_MAX_STA_CONN,
+            .authmode = WIFI_AUTH_WPA_WPA2_PSK
+        },
+    };
+
+    if (strlen(EXAMPLE_ESP_WIFI_PASS) == 0) {
+        ap_wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+    }
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP) ); 
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &ap_wifi_config) );
+#else
+	wifi_config_t sta_wifi_config = {
+        .sta = {
+            .ssid = SSID,
+            .password = PASS
+        },
+    };
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) ); 
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &sta_wifi_config) );
+#endif
+    
+    ESP_ERROR_CHECK(esp_wifi_start() );
+
+#if MODE_AP_STA == 0
+    ESP_LOGI(TAG, "Soft AP initialised. SSID:%s password:%s",
+        EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+#else
+	/* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
+     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+            pdFALSE,
+            pdFALSE,
+            portMAX_DELAY);
+
+    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
+     * happened. */
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
+                 SSID, PASS);
+    } else if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
+                 SSID, PASS);
+    } else {
+        ESP_LOGE(TAG, "UNEXPECTED EVENT");
+    }
+    vEventGroupDelete(s_wifi_event_group);
+#endif
+    
+    ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler));
+    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler));   
+}
+
+void lv_tutorial_objects(void)
+{
+
+    /********************
+     * CREATE A SCREEN
+     *******************/
+    /* Create a new screen and load it
+     * Screen can be created from any type object type
+     * Now a Page is used which is an objects with scrollable content*/
+    static lv_style_t style;
+    lv_style_copy(&style, &lv_style_plain);
+    style.body.main_color = LV_COLOR_BLUE;
+    style.body.grad_color = LV_COLOR_BLUE;
+    style.text.color = LV_COLOR_WHITE;
+    lv_obj_t * scr = lv_page_create(NULL, NULL);
+    lv_page_set_style(scr, LV_PAGE_STYLE_BG, &style);
+    lv_page_set_style(scr, LV_PAGE_STYLE_SCRL, &style);
+    lv_page_set_sb_mode(scr, LV_SB_MODE_OFF);
+    lv_disp_load_scr(scr);
+
+    /****************
+     * ADD A TITLE
+     ****************/
+    lv_obj_t * label = lv_label_create(scr, NULL); /*First parameters (scr) is the parent*/
+    lv_label_set_text(label, "Test for flickering");  /*Set the text*/
+    lv_obj_set_x(label, 30);                        /*Set the x coordinate*/
+
+    /****************
+     * ADD A STATUS FIELD
+     ****************/
+
+    cont = lv_cont_create(lv_scr_act(), NULL);              //Global static definition so accessible in CB
+    lv_obj_set_auto_realign(cont, true);                    /*Auto realign when the size changes*/
+    lv_obj_align_origo(cont, NULL, LV_ALIGN_CENTER, 0, 0);  /*This parametrs will be sued when realigned*/
+    lv_cont_set_fit(cont, LV_FIT_TIGHT);
+    lv_cont_set_layout(cont, LV_LAYOUT_COL_M);
+
+    label = lv_label_create(cont, NULL);
+    #if MODE_AP_STA == 0
+	lv_label_set_text(label, "AP MODE");
+    #else
+	lv_label_set_text(label, "STA MODE");
+    #endif
+    
+
+    /***********************
+     * CREATE TWO BUTTONS
+     ***********************/
+    /*Create a button*/
+    lv_obj_t * btn1 = lv_btn_create(lv_disp_get_scr_act(NULL), NULL);         /*Create a button on the currently loaded screen*/
+    lv_obj_set_event_cb(btn1, btn_event_cb);                                  /*Set function to be called when the button is released*/
+    lv_obj_align(btn1, scr, LV_ALIGN_IN_BOTTOM_LEFT, 0, 0);               /*Align below the label*/
+
+    /*Create a label on the button (the 'label' variable can be reused)*/
+    label = lv_label_create(btn1, NULL);
+    lv_label_set_text(label, "<--");
+
+    /*Copy the previous button*/
+    lv_obj_t * btn2 = lv_btn_create(scr, btn1);                 /*Second parameter is an object to copy*/
+    lv_obj_align(btn2, scr, LV_ALIGN_IN_BOTTOM_RIGHT, 0, 0);    /*Align next to the prev. button.*/
+
+    /*Create a label on the button*/
+    label = lv_label_create(btn2, NULL);
+    lv_label_set_text(label, "-->");
+}
+
+static void btn_event_cb(lv_obj_t * btn, lv_event_t event)
+{
+    if(event == LV_EVENT_RELEASED) {
+        lv_obj_t * label = lv_label_create(cont, NULL);
+        lv_obj_t * btnLabel = lv_obj_get_child(btn, NULL);
+        const char * txt = lv_label_get_text(btnLabel);
+        printf("%s button pressed", txt);
+        printf("button was pressed\n");
+        lv_label_set_text(label, "Button Pressed");
+    }
+}
