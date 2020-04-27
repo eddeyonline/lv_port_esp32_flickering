@@ -1,23 +1,33 @@
-menu "Example Options"
+menu "Project Configuration"
 
-config LED_PIN
-  int "LED GPIO Pin"
-  range 0 40
-  default 2
-  help
-    GPIO Connected to LED. Many of the ESP32 development
-    boards have one connected to pin 2.
-
-config AP_SSID
-  string "Access Point SSID"
-  default "ESP32 Test"
-  help
-    Name of access point that the ESP32 creates.
-
-config AP_PSSWD
-  string "Access Point Password"
-  default "hello world"
-  help
-    Password of access point that the ESP32 creates.
+    config ESP_AP_WIFI_SSID
+        string "WiFi AP Mode SSID"
+	default "myssid"
+        help
+            Your WiFi SSID
+    
+    config ESP_AP_WIFI_PASSWORD
+        string "WiFi AP Mode password"
+	default "mypassword"
+        help
+            Your WiFi password
+    
+    config ESP_AP_MAX_STA_CONN
+        int "WiFi AP Mode max retry"
+	default 5
+        help
+            Max retry
+    
+    config ESP_WIFI_SSID
+        string "WiFi SSID"
+	default "myssid"
+        help
+            Your WiFi SSID
+    
+    config ESP_WIFI_PASSWORD
+        string "WiFi password"
+	default "mypassword"
+        help
+            Your WiFi password
 
 endmenu
